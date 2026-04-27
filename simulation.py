@@ -11,8 +11,8 @@ m = 1
 L = 1
 tfinal = 10
 
-dx = 0.05
-dt = dx**2
+dx = 0.01
+dt = dx
 
 J = round(2*L/dx) + 1
 N = round(tfinal/dt) + 1
@@ -26,9 +26,9 @@ V = np.zeros(J)
 
 psi = np.zeros((J, N), dtype=complex)
 
-# Gaussian initial state
-psi[:,0] = np.exp(-20*x**2)
-psi[:,0] /= np.linalg.norm(psi)
+# initial state
+gaussian = np.exp(-20*x**2)
+psi[:,0] = gaussian/np.linalg.norm(gaussian)
 
 # since Dirichlet boundary conditions are 0, only update interior
 psi[1,0] = 0
@@ -48,9 +48,11 @@ lu, piv = lu_factor(A)
 for n in range(N-1):
     psi[1:-1,n+1] = lu_solve((lu, piv), B @ psi[1:-1,n])
 
+# TODO: record/analyse pdf integral
+
 # plot animation
 fig = plt.figure() 
-ax = plt.axes(xlim =(-L, L), ylim =(0, 1)) 
+ax = plt.axes(xlim =(-L, L), ylim =(0, 0.25)) 
 
 pdf, = ax.plot([], [], label='Probability density')
 re, = ax.plot([], [], label='Real part')
@@ -63,6 +65,7 @@ ax.set_ylabel('$|\\Psi|^2$')
 ax.legend()
 
 def update(i):
+    # y_pdf = psi[:,i].conj() * psi[:,i]
     y_pdf = np.abs(psi[:,i])**2
     y_re = np.real(psi[:,i])
     y_im = np.imag(psi[:,i])
@@ -75,5 +78,5 @@ def update(i):
 
     return pdf, re, im
  
-anim = FuncAnimation(fig, update, frames=range(0, N, 10), interval=50, blit=True)
+anim = FuncAnimation(fig, update, frames=range(0, N, 10), interval=90, blit=True)
 anim.save('anim.gif')#, fps=24)

@@ -1,3 +1,4 @@
+# Crank-Nicholson numerical simulation of Schroedinger's equation
 $$\renewcommand{\vec}{\mathbf}$$
 
 The time-dependent Schroedinger equation is
@@ -36,6 +37,6 @@ $$ B = \begin{pmatrix}
 At each timestep, the state is updated by solving this system.
 To do this efficiently, LU decomposition was used.
 
-The probability density of an infinite square potential well system with $dx = 0.05$, $dt = dx^2$ and Gaussian initial state is shown below.
+The probability density of an infinite square potential well system with $\Delta x = \Delta t = 0.01$ and Gaussian initial state is shown below.
 
 ![](anim.gif)
