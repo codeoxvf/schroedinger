@@ -1,5 +1,5 @@
 # Crank-Nicholson numerical simulation of Schroedinger's equation
-$$\renewcommand{\vec}{\mathbf}$$
+<!-- $$\renewcommand{\vec}{\mathbf}$$ -->
 
 The time-dependent Schroedinger equation is
 $$ i\hbar \frac{\partial}{\partial t} \Psi(x,t) = \left( -\frac{\hbar^2}{2m} \frac{\partial ^2}{\partial x^2} + V(x) \right) \Psi(x,t). $$
