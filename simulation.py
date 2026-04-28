@@ -1,82 +1,97 @@
+from dataclasses import dataclass
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation 
 
-# physical constants
-hbar = 1
-m = 1
+@dataclass
+class SolverParams:
+    a: float
+    b: float
+    tfinal: float
+    dx: float
+    dt: float
 
-# system parameters
-L = 1
-tfinal = 10
+    @property
+    def J(self):
+        return round((self.b-self.a)/self.dx) + 1
 
-dx = 0.01
-dt = dx
+    @property
+    def N(self):
+        return round(self.tfinal/self.dt) + 1
 
-J = round(2*L/dx) + 1
-N = round(tfinal/dt) + 1
+def cn_solve(params, V, psi0):
+    a, b, dx, J = params.a, params.b, params.dx, params.J
+    tfinal, dt, N = params.tfinal, params.dt, params.N
 
-x = np.linspace(-L, L, J)
+    psi = np.zeros((J, N), dtype=complex)
+    psi[:,0] = psi0
 
-# infinite square well
-# a = 1
-# V = np.where((x < -a) | (x > a), np.inf, 0)
-V = np.zeros(J)
+    # set up matrix equation
+    # hbar = m = 1
+    alpha = 1/(4*dx**2)
+    beta = 1j/dt
 
-psi = np.zeros((J, N), dtype=complex)
+    # since Dirichlet boundary conditions are 0, only update interior
+    diag = np.full(J-2-1, alpha)
 
-# initial state
-gaussian = np.exp(-20*x**2)
-psi[:,0] = gaussian/np.linalg.norm(gaussian)
+    A = np.diag(beta - 2*alpha - V[1:-1]/2) + np.diag(diag, 1) + np.diag(diag, -1)
+    B = np.diag(beta + 2*alpha + V[1:-1]/2) - np.diag(diag, 1) - np.diag(diag, -1)
 
-# since Dirichlet boundary conditions are 0, only update interior
-psi[1,0] = 0
-psi[-1,0] = 0
+    # update state
+    lu, piv = lu_factor(A)
+    for n in range(N-1):
+        psi[1:-1,n+1] = lu_solve((lu, piv), B @ psi[1:-1,n])
+        if n % ((N-1)//10) == 0:
+            print(f'{100*n/(N-1):.0f}%')
 
-# matrix equation
-alpha = hbar**2/(4*m*dx**2)
-beta = 1j*hbar/dt
+    # TODO: record/analyse pdf integral
+    return psi
 
-diag = np.full(J-2-1, alpha)
+def animate_wavefunction(psi, params, filename=None, display='all', every=2, timescale=1.0,
+    axes_kwargs={'ylim': (0, 1)}):
+    display = display.split(' ')
 
-A = np.diag(beta - 2*alpha - V[1:-1]/2) + np.diag(diag, 1) + np.diag(diag, -1)
-B = np.diag(beta + 2*alpha + V[1:-1]/2) - np.diag(diag, 1) - np.diag(diag, -1)
+    fig = plt.figure() 
+    ax = plt.axes(xlim =(params.a, params.b), **axes_kwargs) 
 
-# update state
-lu, piv = lu_factor(A)
-for n in range(N-1):
-    psi[1:-1,n+1] = lu_solve((lu, piv), B @ psi[1:-1,n])
+    if 'all' in display or 'pdf' in display:
+        pdf, = ax.plot([], [], label='Probability density')
+    if 'all' in display or 'real' in display:
+        re, = ax.plot([], [], label='Real part')
+    if 'all' in display or 'imag' in display:
+        im, = ax.plot([], [], label='Imaginary part')
 
-# TODO: record/analyse pdf integral
+    text = ax.text(0.01, 0.98, '$t = 0.00$', transform=ax.transAxes, va='top')
 
-# plot animation
-fig = plt.figure() 
-ax = plt.axes(xlim =(-L, L), ylim =(0, 0.25)) 
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$|\\Psi|^2$')
+    ax.legend()
 
-pdf, = ax.plot([], [], label='Probability density')
-re, = ax.plot([], [], label='Real part')
-im, = ax.plot([], [], label='Imaginary part')
+    x = np.linspace(params.a, params.b, params.J)
+    if 'all' in display or 'pdf' in display:
+        # y_pdf = psi[i].conj() * psi[i]
+        y_pdf = np.abs(psi)**2
+    if 'all' in display or 'real' in display:
+        y_re = np.real(psi)
+    if 'all' in display or 'imag' in display:
+        y_im = np.imag(psi)
 
-text = ax.text(-0.95, 0.8, '$t = 0.00$')
+    def update(i):
+        if 'all' in display or 'pdf' in display:
+            pdf.set_data(x, y_pdf[:,i])
+        if 'all' in display or 'real' in display:
+            re.set_data(x, y_re[:,i])
+        if 'all' in display or 'imag' in display:
+            im.set_data(x, y_im[:,i])
 
-ax.set_xlabel('$x$')
-ax.set_ylabel('$|\\Psi|^2$')
-ax.legend()
+        text.set_text(f'$t = {i*params.dt:.2f}$')
 
-def update(i):
-    # y_pdf = psi[:,i].conj() * psi[:,i]
-    y_pdf = np.abs(psi[:,i])**2
-    y_re = np.real(psi[:,i])
-    y_im = np.imag(psi[:,i])
+        return pdf, re, im, text
 
-    pdf.set_data(x, y_pdf)
-    re.set_data(x, y_re)
-    im.set_data(x, y_im)
+    anim = FuncAnimation(fig, update, frames=range(0, params.N, every),
+        interval=1e3*every*params.dt/timescale, blit=True)
+    if filename:
+        anim.save(filename, fps=timescale*params.N/(every*params.tfinal))
 
-    text.set_text(f'$t = {i*dt:.2f}$')
-
-    return pdf, re, im
- 
-anim = FuncAnimation(fig, update, frames=range(0, N, 10), interval=90, blit=True)
-anim.save('anim.gif')#, fps=24)
+    return anim
