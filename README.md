@@ -12,7 +12,8 @@ We see that the $n=1$ eigenstate dominates, since the magnitude of the eigenstat
 
 Since the wavefunction $\Psi$ must be normalisable, $\Psi \to 0$ as $x \to \pm\infty$.
 Therefore, we assume that the magnitude of $\Psi$ is negligible at the boundaries and impose zero Dirichlet boundary conditions.
-For scattering states, the boundaries must be handled differently and this will be implemented in future.
+For scattering states, the boundaries must be handled differently.
+This will be implemented in future.
 
 ## Error analysis
 We use the exact solution as described below to calculate the root mean squared error (RMSE) for the numerical solution.
