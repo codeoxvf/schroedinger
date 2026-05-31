@@ -1,26 +1,41 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation 
 
 @dataclass
-class SolverParams:
+class SystemParams:
     x_min: float
     x_max: float
     t_final: float
     dx: float
     dt: float
+    # x and t discretised axes
+    x: np.ndarray = field(init=False)
+    t: np.ndarray = field(init=False)
 
+    def __post_init__(self):
+        self.x = np.linspace(self.x_min, self.x_max, self.Nx)
+        self.t = np.linspace(0, self.t_final, self.Nt)
+
+    # number of grid coordinates for x
     @property
     def Nx(self):
         return round((self.x_max-self.x_min)/self.dx) + 1
 
+    # number of grid coordinates for t
     @property
     def Nt(self):
         return round(self.t_final/self.dt) + 1
 
-def cn_solve(params, V, psi0, progress=False):
+@dataclass
+class System:
+    params: SystemParams
+    V: np.ndarray
+    psi: np.ndarray
+
+def cn_solve(params: SystemParams, V: np.ndarray, psi0: np.ndarray, progress=False):
     x_min, x_max, dx, Nx = params.x_min, params.x_max, params.dx, params.Nx
     t_final, dt, Nt = params.t_final, params.dt, params.Nt
 
@@ -46,14 +61,19 @@ def cn_solve(params, V, psi0, progress=False):
             print(f'{100*n/(Nt-1):.0f}%')
 
     # TODO: record/analyse pdf integral
-    return psi
+    return System(params, V, psi)
 
-def animate_wavefunction(psi, params, filename=None, display='all', every=2, timescale=1.0,
-    axes_kwargs={'ylim': (-0.25, 1)}):
+def animate_wavefunction(result: System, filename=None, display='all', every=2, timescale=1.0,
+    axes_kwargs={'ylim': (-1, 1)}):
     display = display.split(' ')
 
     fig = plt.figure() 
-    ax = plt.axes(xlim =(params.x_min, params.x_max), **axes_kwargs) 
+    ax = plt.axes(xlim =(result.params.x_min, result.params.x_max), **axes_kwargs) 
+
+    # draw potential
+    V_max = np.max(result.V)
+    if not np.isclose(V_max, 0.0):
+        ax.plot(result.params.x, 0.2*result.V/V_max, color='black', linewidth=1.5, alpha=0.7)
 
     if 'all' in display or 'pdf' in display:
         pdf, = ax.plot([], [], label='Probability density')
@@ -68,14 +88,14 @@ def animate_wavefunction(psi, params, filename=None, display='all', every=2, tim
     ax.set_ylabel('$|\\Psi|^2$')
     ax.legend()
 
-    x = np.linspace(params.x_min, params.x_max, params.Nx)
+    x = np.linspace(result.params.x_min, result.params.x_max, result.params.Nx)
     if 'all' in display or 'pdf' in display:
         # y_pdf = psi[i].conj() * psi[i]
-        y_pdf = np.abs(psi)**2
+        y_pdf = np.abs(result.psi)**2
     if 'all' in display or 'real' in display:
-        y_re = np.real(psi)
+        y_re = np.real(result.psi)
     if 'all' in display or 'imag' in display:
-        y_im = np.imag(psi)
+        y_im = np.imag(result.psi)
 
     def update(t):
         if 'all' in display or 'pdf' in display:
@@ -85,13 +105,13 @@ def animate_wavefunction(psi, params, filename=None, display='all', every=2, tim
         if 'all' in display or 'imag' in display:
             im.set_data(x, y_im[:,t])
 
-        text.set_text(f'$t = {t*params.dt:.2f}$')
+        text.set_text(f'$t = {t*result.params.dt:.2f}$')
 
         return pdf, re, im, text
 
-    anim = FuncAnimation(fig, update, frames=range(0, params.N, every),
-        interval=1e3*every*params.dt/timescale, blit=True)
+    anim = FuncAnimation(fig, update, frames=range(0, result.params.Nt, every),
+        interval=1e3*every*result.params.dt/timescale, blit=True)
     if filename:
-        anim.save(filename, fps=timescale*params.N/(every*params.t_final))
+        anim.save(filename, fps=timescale*result.params.Nt/(every*result.params.t_final))
 
     return anim

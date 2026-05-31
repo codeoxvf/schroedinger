@@ -1,28 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from simulation import SolverParams, cn_solve, animate_wavefunction
-from multiprocessing import Process
+from wavefunction import norm, normalise
+from simulation import SystemParams, cn_solve, animate_wavefunction
 
-x_min = 0
-x_max = 1
-t_final = 10
-dx = 0.01
-dt = dx
-params = SolverParams(x_min, x_max, t_final, dx, dt)
-
-x = np.linspace(params.x_min, params.x_max, params.Nx)
-t = np.linspace(0, params.t_final, params.Nt)
+params = SystemParams(x_min=0, x_max=1, t_final=5, dx=0.01, dt=0.01)
 
 # infinite square well
 V = np.zeros(params.Nx)
 
 # quadratic initial state
-psi0 = (x_min-x) * (x_max-x)
-psi0 /= np.linalg.norm(psi0)
+psi0 = (params.x_min - params.x) * (params.x_max - params.x)
+psi0 = normalise(params, psi0)
 
 # numerical solver
-psi_num = cn_solve(params, V, psi0)
+result = cn_solve(params, V, psi0)
 
 # exact solutions for eigenstates
 def psi_n(n, x, t):
@@ -31,33 +23,40 @@ def psi_n(n, x, t):
 n_max = 5
 
 # overlap integral to find c_n
-coeffs = np.array([np.sum(np.vdot(psi_n(n, x, 0), psi0)) * dx
+coeffs = np.array([np.sum(np.vdot(psi_n(n, params.x, 0), psi0)) * params.dx
     for n in range(n_max+1)])
 
-X, T = np.meshgrid(x, t, indexing='ij')
+X, T = np.meshgrid(params.x, params.t, indexing='ij')
 eigenstates = np.array([coeffs[n] * psi_n(n, X, T) for n in range(n_max+1)])
 psi_exact = np.sum(eigenstates, axis=0)
 
 # normalise
-A = np.linalg.norm(psi_exact[:,0])
+A = norm(params, psi_exact[:,0])
 psi_exact /= A
 eigenstates /= A
 
 # adjust phase to look matched on plot
-phase = np.angle(np.vdot(psi_exact[:,0], psi_num[:,0]))
+phase = np.angle(np.vdot(psi_exact[:,0], result.psi[:,0]))
 psi_exact *= np.exp(-1j*phase)
 
-rmse = np.std(psi_num, mean=psi_exact)
+rmse = np.std(result.psi, mean=psi_exact)
 print(f'rmse: {rmse}')
 
-rmse_t = np.std(psi_num, mean=psi_exact, axis=0)
-plt.scatter(t, rmse_t, marker='.')
-plt.xlabel('$t$')
-plt.ylabel('rmse')
-plt.title('RMS error')
-plt.tight_layout()
-plt.savefig('rmse.png')
+rmse_t = np.std(result.psi, mean=psi_exact, axis=0)
+# plt.scatter(t, rmse_t, marker='.')
+# plt.xlabel('$t$')
+# plt.ylabel('rmse')
+# plt.title('RMS error')
+# plt.tight_layout()
+# plt.savefig('rmse.png')
 # plt.show()
+
+# anim1 = animate_wavefunction(result)
+# result.psi = psi_exact
+# anim2 = animate_wavefunction(result)
+# plt.show()
+
+# exit()
 
 # pdf, real, imag
 def generate_data(psi):
@@ -69,7 +68,7 @@ for n in range(n_max+1):
         ns.append(n)
 
 data = {
-    'num': generate_data(psi_num),
+    'num': generate_data(result.psi),
     'exact': generate_data(psi_exact),
 }
 for i in range(len(ns)):
@@ -86,7 +85,7 @@ for i in range(len(ns)):
 fig, axs = plt.subplots(1, 3)
 
 titles = ['Probability density', 'Real part', 'Imaginary part']
-ylims = [(0, 0.1), (-0.25, 0.25), (-0.25, 0.25)]
+ylims = [(0, 2.5), (-1.5, 1.5), (-1.5, 1.5)]
 plots = []
 for i, ax in enumerate(axs):
     lines = {}
@@ -108,7 +107,7 @@ def update(t):
     artists = []
     for i, plot in enumerate(plots):
         for key in data:
-            plot[key].set_data(x, data[key][i,:,t])
+            plot[key].set_data(params.x, data[key][i,:,t])
             artists.append(plot[key])
 
     text.set_text(f'$t = {t*params.dt:.2f}$')
