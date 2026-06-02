@@ -130,8 +130,7 @@ class WaveFunctionHistory:
         return np.sqrt(np.sum(self.pdf(), axis=0) * self.grid.dx)
 
     def _normalise(self):
-        psi0 = WaveFunction(self.grid, self.at_time(0))
-        self.psi /= psi0.norm()
+        self.psi /= self.at_time(0).norm()
 
 titles = {
     'pdf': 'Probability density',
