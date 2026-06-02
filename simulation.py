@@ -1,117 +1,289 @@
-from dataclasses import dataclass, field
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
+
+from dataclasses import dataclass, field
+from numpy.typing import ArrayLike
+from typing import Union
+from collections.abc import Callable
+
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation 
 
 @dataclass
-class SystemParams:
+class Grid:
+    '''Discretised space/time coordinate grid for numerical solvers.
+
+    Parameters
+    ----------
+    x_min : float
+        Lower bound for x-coordinates.
+    x_max : float
+        Upper bound for x-coordinates.
+    t_final : float
+        Final time until which to evolve the system.
+    dx : float
+        Step-size for spatial coordinate grid.
+    dt : float
+        Step-size for temporal coordinate grid.
+
+    Attributes
+    ----------
+    x : ArrayLike
+        Spatial coordinate grid of the discretised interval [`x_min`, `x_max`].
+    t : ArrayLike
+        Temporal coordinate grid of the discretised interval [0, `t_final`].
+    Nx : int
+        Number of spatial grid coordinates.
+    Nt : int
+        Number of temporal grid coordinates.
+    '''
+
     x_min: float
     x_max: float
     t_final: float
     dx: float
     dt: float
-    # x and t discretised axes
-    x: np.ndarray = field(init=False)
-    t: np.ndarray = field(init=False)
+    x: ArrayLike = field(init=False)
+    t: ArrayLike = field(init=False)
 
     def __post_init__(self):
         self.x = np.linspace(self.x_min, self.x_max, self.Nx)
         self.t = np.linspace(0, self.t_final, self.Nt)
 
-    # number of grid coordinates for x
     @property
     def Nx(self):
         return round((self.x_max-self.x_min)/self.dx) + 1
 
-    # number of grid coordinates for t
     @property
     def Nt(self):
         return round(self.t_final/self.dt) + 1
 
-@dataclass
-class System:
-    params: SystemParams
-    V: np.ndarray
-    psi: np.ndarray
+class WaveFunction:
+    '''Position-space discretised wavefunction.
 
-def cn_solve(params: SystemParams, V: np.ndarray, psi0: np.ndarray, progress=False):
-    x_min, x_max, dx, Nx = params.x_min, params.x_max, params.dx, params.Nx
-    t_final, dt, Nt = params.t_final, params.dt, params.Nt
+    Parameters
+    ----------
+    grid : Grid
+        Grid on which the wavefunction is defined.
+    psi : ArrayLike or Callable
+        Wavefunction data.
+    normalise : bool, default True
+        Normalise the given wavefunction on creation.
+    '''
 
-    psi = np.zeros((Nx, Nt), dtype=complex)
-    psi[:,0] = psi0
+    def __init__(self, grid: Grid, psi: Union(ArrayLike, Callable), normalise=True):
+        self.grid = grid
+
+        if callable(psi):
+            self.psi = psi(grid)
+        else:
+            self.psi = psi
+        
+        assert self.psi.ndim == 1
+
+        if normalise:
+            self._normalise()
+
+    def pdf(self):
+        return np.abs(self.psi)**2
+
+    def norm(self):
+        return np.sqrt(np.sum(self.pdf()) * self.grid.dx)
+
+    def _normalise(self):
+        self.psi /= self.norm()
+
+class WaveFunctionHistory:
+    '''Evolution history of a wavefunction over time.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid on which the wavefunction is defined.
+    psi : ArrayLike
+        Wavefunction history data.
+    normalise : bool, default True
+        Normalise the given wavefunction history on creation by the norm at t=0.
+    '''
+    def __init__(self, grid: Grid, psi: ArrayLike, normalise=True):
+        self.grid = grid
+        self.psi = psi
+
+        assert self.psi.ndim == 2
+
+        if normalise:
+            self._normalise()
+
+    def at_time(self, t: int):
+        return self.psi[:,t]
+
+    def pdf(self):
+        return np.abs(self.psi)**2
+
+    def norm(self):
+        return np.sqrt(np.sum(self.pdf(), axis=0) * self.grid.dx)
+
+    def _normalise(self):
+        psi0 = WaveFunction(self.grid, self.at_time(0))
+        self.psi /= psi0.norm()
+
+titles = {
+    'pdf': 'Probability density',
+    'real': 'Real part',
+    'imag': 'Imaginary part',
+}
+ylabels = {
+    'pdf': '$|\\Psi|^2$',
+    'real': '$\\mathrm{Re}(\\Psi)$',
+    'imag': '$\\mathrm{Im}(\\Psi)$',
+}
+transforms = {
+    'pdf': lambda psi: np.abs(psi)**2,
+    'real': lambda psi: np.real(psi),
+    'imag': lambda psi: np.imag(psi),
+}
+
+def cn_solve(psi0: WaveFunction, V: ArrayLike, progress=False):
+    '''Numerically solve the Schroedinger equation over time for the given
+        initial condtions.
+        
+    Parameters
+    ----------
+    psi0 : WaveFunction
+        Initial state of the wavefunction.
+    V : ArrayLike
+        Potential for the system.
+    progress : bool, default False
+        Print computation progress percentages.
+
+    Returns
+    -------
+    WaveFunctionHistory
+        Evolution history of the initial state over time.
+    '''
+    grid = psi0.grid
+
+    psi = np.zeros((grid.Nx, grid.Nt), dtype=complex)
+    psi[:,0] = psi0.psi
 
     # set up matrix equation
     # hbar = m = 1
-    alpha = 1/(4*dx**2)
-    beta = 1j/dt
+    alpha = 1/(4*grid.dx**2)
+    beta = 1j/grid.dt
 
     # since Dirichlet boundary conditions are 0, only update interior
-    diag = np.full(Nx-2-1, alpha)
-
-    A = np.diag(beta - 2*alpha - V[1:-1]/2) + np.diag(diag, 1) + np.diag(diag, -1)
-    B = np.diag(beta + 2*alpha + V[1:-1]/2) - np.diag(diag, 1) - np.diag(diag, -1)
+    d = np.full(grid.Nx-2-1, alpha)
+    A = np.diag(beta - 2*alpha - V[1:-1]/2) + np.diag(d, 1) + np.diag(d, -1)
+    B = np.diag(beta + 2*alpha + V[1:-1]/2) - np.diag(d, 1) - np.diag(d, -1)
 
     # update state
     lu, piv = lu_factor(A)
-    for n in range(Nt-1):
+    for n in range(grid.Nt-1):
         psi[1:-1,n+1] = lu_solve((lu, piv), B @ psi[1:-1,n])
-        if progress and n % ((Nt-1)//10) == 0:
-            print(f'{100*n/(Nt-1):.0f}%')
+        if progress and n % ((grid.Nt-1)//10) == 0:
+            print(f'{100*n/(grid.Nt-1):.0f}%')
 
-    # TODO: record/analyse pdf integral
-    return System(params, V, psi)
+    return WaveFunctionHistory(grid, psi)
 
-def animate_wavefunction(result: System, filename=None, display='all', every=2, timescale=1.0,
-    axes_kwargs={'ylim': (-1, 1)}):
-    display = display.split(' ')
+def animate_histories(histories: ArrayLike, V=None, labels=None, filename=None, display='all',
+    every=2, timescale=1.0, **kwargs):
+    '''Animate the evolution of one or more quantum systems over time.
 
-    fig = plt.figure() 
-    ax = plt.axes(xlim =(result.params.x_min, result.params.x_max), **axes_kwargs) 
+    Parameters
+    ----------
+    histories : ArrayLike
+        WaveFunctionHistory or list of such to be animated.
+    V : ndarray, default None
+        Potential for the system.
+    labels : ArrayLike, default None
+        Labels for the histories. If None, legend is not shown.
+    filename : str
+        Name of the file to which the animation is saved. If None, animation
+        is not saved.
+    display : str or list
+        Components to plot ('all', 'pdf', 'real', 'imag').
+    every : int
+        Number of time steps between each frame.
+    timescale : float
+        Animation speed (1 for real-time).
+    **kwargs
+        Extra arguments for subplots.
+
+    Returns
+    -------
+    FuncAnimation
+        The generated animation.
+    '''
+    # clean up input formats (make iterable)
+    if isinstance(histories, WaveFunctionHistory):
+        histories = [histories]
+    
+    showlabels = True
+    if not labels:
+        labels = list(range(len(histories)))
+        showlabels = False
+    else:
+        assert len(labels) == len(histories)
+
+    grid = histories[0].grid
+    for h in histories:
+        assert h.grid == grid
+
+    # display plots in correct order
+    s = display
+    display = []
+    if 'pdf' in s or 'all' in s:
+        display.append('pdf')
+    if 'real' in s or 'all' in s:
+        display.append('real')
+    if 'imag' in s or 'all' in s:
+        display.append('imag')
+    
+    kwargs['xlim'] = (grid.x_min, grid.x_max)
+    kwargs.setdefault('ylim', (-1, 1))
+
+    fig, axes = plt.subplots(len(display), 1, subplot_kw=kwargs)
+    if isinstance(axes, plt.Axes):
+        axes = [axes]
 
     # draw potential
-    V_max = np.max(result.V)
-    if not np.isclose(V_max, 0.0):
-        ax.plot(result.params.x, 0.2*result.V/V_max, color='black', linewidth=1.5, alpha=0.7)
+    if V:
+        V_max = np.max(V)
+        if not np.isclose(V_max, 0.0):
+            ax.plot(grid.x, 0.2*V/V_max, color='black', linewidth=1.5, alpha=0.7)
 
-    if 'all' in display or 'pdf' in display:
-        pdf, = ax.plot([], [], label='Probability density')
-    if 'all' in display or 'real' in display:
-        re, = ax.plot([], [], label='Real part')
-    if 'all' in display or 'imag' in display:
-        im, = ax.plot([], [], label='Imaginary part')
+    # plot lines
+    lines = {}
+    ys = {}
+    for d, ax in zip(display, axes):
+        y_max = -np.inf
+        y_min = np.inf
+        for i, h in enumerate(histories):
+            lines[f'{labels[i]} {d}'], = ax.plot([], [], label=labels[i])
+            ys[f'{labels[i]} {d}'] = (transforms[d](h.psi))
+            y_max = max(y_max, np.max(ys[f'{labels[i]} {d}']))
+            y_min = min(y_min, np.min(ys[f'{labels[i]} {d}']))
 
+        ax.set_xlabel('$x$')
+        ax.set_ylabel(ylabels[d])
+        ax.set_ylim(1.1*y_min, 1.1*y_max)
+
+    ax = axes[0]
+    if showlabels:
+        fig.legend(*ax.get_legend_handles_labels())#, loc='lower right')
     text = ax.text(0.01, 0.98, '$t = 0.00$', transform=ax.transAxes, va='top')
 
-    ax.set_xlabel('$x$')
-    ax.set_ylabel('$|\\Psi|^2$')
-    ax.legend()
-
-    x = np.linspace(result.params.x_min, result.params.x_max, result.params.Nx)
-    if 'all' in display or 'pdf' in display:
-        # y_pdf = psi[i].conj() * psi[i]
-        y_pdf = np.abs(result.psi)**2
-    if 'all' in display or 'real' in display:
-        y_re = np.real(result.psi)
-    if 'all' in display or 'imag' in display:
-        y_im = np.imag(result.psi)
-
     def update(t):
-        if 'all' in display or 'pdf' in display:
-            pdf.set_data(x, y_pdf[:,t])
-        if 'all' in display or 'real' in display:
-            re.set_data(x, y_re[:,t])
-        if 'all' in display or 'imag' in display:
-            im.set_data(x, y_im[:,t])
+        for d in lines:
+            lines[d].set_data(grid.x, ys[d][:,t])
 
-        text.set_text(f'$t = {t*result.params.dt:.2f}$')
+        text.set_text(f'$t = {t*grid.dt:.2f}$')
 
-        return pdf, re, im, text
+        return *lines.values(), text
 
-    anim = FuncAnimation(fig, update, frames=range(0, result.params.Nt, every),
-        interval=1e3*every*result.params.dt/timescale, blit=True)
+    anim = FuncAnimation(fig, update, frames=range(0, grid.Nt, every),
+        interval=1e3*every*grid.dt/timescale, blit=True)
     if filename:
-        anim.save(filename, fps=timescale*result.params.Nt/(every*result.params.t_final))
+        anim.save(filename, fps=timescale*grid.Nt/(every*grid.t_final))
 
     return anim
