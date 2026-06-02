@@ -85,9 +85,11 @@ class WaveFunction:
             self._normalise()
 
     def pdf(self):
+        '''Return the pdf of the wavefunction.'''
         return np.abs(self.psi)**2
 
     def norm(self):
+        '''Return the norm of the wavefunction.'''
         return np.sqrt(np.sum(self.pdf()) * self.grid.dx)
 
     def _normalise(self):
@@ -105,6 +107,7 @@ class WaveFunctionHistory:
     normalise : bool, default True
         Normalise the given wavefunction history on creation by the norm at t=0.
     '''
+
     def __init__(self, grid: Grid, psi: ArrayLike, normalise=True):
         self.grid = grid
         self.psi = psi
@@ -115,12 +118,15 @@ class WaveFunctionHistory:
             self._normalise()
 
     def at_time(self, t: int):
-        return self.psi[:,t]
+        '''Return the wavefunction at time t.'''
+        return WaveFunction(self.grid, self.psi[:,t], normalise=False)
 
     def pdf(self):
+        '''Return the pdf of the wavefunction over time.'''
         return np.abs(self.psi)**2
 
     def norm(self):
+        '''Return the norm of the wavefunction over time.'''
         return np.sqrt(np.sum(self.pdf(), axis=0) * self.grid.dx)
 
     def _normalise(self):
