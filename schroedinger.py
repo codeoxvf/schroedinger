@@ -80,6 +80,7 @@ class WaveFunction:
             self.psi = psi
         
         assert self.psi.ndim == 1
+        assert self.psi.shape[0] == self.grid.Nx
 
         if normalise:
             self._normalise()
@@ -113,12 +114,14 @@ class WaveFunctionHistory:
         self.psi = psi
 
         assert self.psi.ndim == 2
+        assert self.psi.shape[0] == self.grid.Nx
+        assert self.psi.shape[1] == self.grid.Nt
 
         if normalise:
             self._normalise()
 
     def at_time(self, t: int):
-        '''Return the wavefunction at time t.'''
+        '''Return the wavefunction at time index t.'''
         return WaveFunction(self.grid, self.psi[:,t], normalise=False)
 
     def pdf(self):
