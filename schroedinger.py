@@ -95,6 +95,13 @@ class WaveFunction:
 
     def _normalise(self):
         self.psi /= self.norm()
+    
+    def T(self):
+        '''Return the kinetic energy of the wavefunction.'''
+        d0 = np.full(self.grid.Nx, -2)
+        d1 = np.full(self.grid.Nx, 1)
+        lap = np.diag(d0) + np.diag(d1, 1) + np.diag(d1, -1)
+        return -0.5/self.grid.dx**2 * lap
 
 class WaveFunctionHistory:
     '''Evolution history of a wavefunction over time.
@@ -162,7 +169,7 @@ def cn_solve(psi0: WaveFunction, V: ArrayLike, progress=False):
     V : ArrayLike
         Potential for the system.
     progress : bool, default False
-        Print computation progress percentages.
+        Print progress percentage.
 
     Returns
     -------
@@ -205,14 +212,14 @@ def animate_histories(histories: ArrayLike, V=None, labels=None, filename=None, 
         Potential for the system.
     labels : ArrayLike, default None
         Labels for the histories. If None, legend is not shown.
-    filename : str
+    filename : str, default None
         Name of the file to which the animation is saved. If None, animation
         is not saved.
-    display : str or list
+    display : str or list, default 'all'
         Components to plot ('all', 'pdf', 'real', 'imag').
-    every : int
+    every : int, default 2
         Number of time steps between each frame.
-    timescale : float
+    timescale : float, default 1.0
         Animation speed (1 for real-time).
     **kwargs
         Extra arguments for subplots.

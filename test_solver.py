@@ -3,14 +3,19 @@ from schroedinger import Grid, WaveFunction, WaveFunctionHistory, cn_solve, anim
 import matplotlib.pyplot as plt
 
 def test_accuracy(
-        history_exact: WaveFunctionHistory, history_num: WaveFunctionHistory,
+        wfh_exact: WaveFunctionHistory, wfh_num: WaveFunctionHistory,
         rtol=1e-5, atol=1e-8):
-    assert np.allclose(history_num.pdf(), history_exact.pdf(), rtol, atol)
+    # pdf
+    assert np.allclose(wfh_num.pdf(), wfh_exact.pdf(), rtol, atol)
+
+    # TODO: Hamiltonian
+
     return True
 
-def test_norm(history_exact: WaveFunctionHistory, rtol=1e-5, atol=1e-8):
-    for t in range(history_exact.grid.Nt):
-        assert np.isclose(history_exact.at_time(t).norm(), 1.0)
+def test_norm(wfh_exact: WaveFunctionHistory, rtol=1e-5, atol=1e-8):
+    for t in range(wfh_exact.grid.Nt):
+        assert np.isclose(wfh_exact.at_time(t).norm(), 1.0)
+
     return True
 
 grid = Grid(x_min=0, x_max=1, t_final=10, dx=0.01, dt=0.01)
@@ -26,10 +31,10 @@ X, T = np.meshgrid(grid.x, grid.t, indexing='ij')
 
 # even eigenstates are zero so only test odd ones
 for n in range(1, 12, 2):
-    history_exact = WaveFunctionHistory(grid, psi_n(n, X, T))
-    history_num = cn_solve(history_exact.at_time(0), V)
+    wfh_exact = WaveFunctionHistory(grid, psi_n(n, X, T))
+    wfh_num = cn_solve(wfh_exact.at_time(0), V)
 
-    if test_accuracy(history_exact, history_num):
+    if test_accuracy(wfh_exact, wfh_num):
         print(f'PDF accuracy test passed for n={n} eigenstate')
-    if test_norm(history_exact):
+    if test_norm(wfh_exact):
         print(f'Normalisation test passed for n={n} eigenstate')
