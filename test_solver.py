@@ -1,6 +1,6 @@
 import numpy as np
-from schroedinger import Grid, WaveFunction, WaveFunctionHistory, cn_solve, animate_histories
-import matplotlib.pyplot as plt
+from quantum import Grid, WaveFunction, WaveFunctionHistory
+from solver import cn_solve
 
 def test_accuracy(
         wfh_exact: WaveFunctionHistory, wfh_num: WaveFunctionHistory,
@@ -20,9 +20,6 @@ def test_norm(wfh_exact: WaveFunctionHistory, rtol=1e-5, atol=1e-8):
 
 grid = Grid(x_min=0, x_max=1, t_final=10, dx=0.01, dt=0.01)
 
-# infinite square well
-V = np.zeros(grid.Nx)
-
 # exact solutions for eigenstates
 def psi_n(n, x, t):
     return np.sin(n*np.pi*x) * np.exp(-1j*n**2 * np.pi**2 * t/2)
@@ -32,7 +29,7 @@ X, T = np.meshgrid(grid.x, grid.t, indexing='ij')
 # even eigenstates are zero so only test odd ones
 for n in range(1, 12, 2):
     wfh_exact = WaveFunctionHistory(grid, psi_n(n, X, T))
-    wfh_num = cn_solve(wfh_exact.at_time(0), V)
+    wfh_num = cn_solve(wfh_exact.at_time(0))
 
     if test_accuracy(wfh_exact, wfh_num):
         print(f'PDF accuracy test passed for n={n} eigenstate')

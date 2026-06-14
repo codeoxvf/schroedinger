@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from schroedinger import Grid, WaveFunction, cn_solve, animate_histories
+from quantum import Grid, WaveFunction, animate_histories
+from solver import cn_solve
 
 grid = Grid(x_min=-35, x_max=35, t_final=5, dx=0.01, dt=0.01)
 
@@ -19,5 +19,5 @@ wf = WaveFunction(grid, psi0)
 
 wfh = cn_solve(wf, V)
 
-anim = animate_histories(wfh, filename='scattering.gif')
+anim = animate_histories(wfh, V=V, filename='scattering.gif')
 plt.show()

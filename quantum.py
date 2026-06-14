@@ -142,11 +142,6 @@ class WaveFunctionHistory:
     def _normalise(self):
         self.psi /= self.at_time(0).norm()
 
-titles = {
-    'pdf': 'Probability density',
-    'real': 'Real part',
-    'imag': 'Imaginary part',
-}
 ylabels = {
     'pdf': '$|\\Psi|^2$',
     'real': '$\\mathrm{Re}(\\Psi)$',
@@ -157,48 +152,6 @@ transforms = {
     'real': lambda psi: np.real(psi),
     'imag': lambda psi: np.imag(psi),
 }
-
-def cn_solve(psi0: WaveFunction, V: ArrayLike, progress=False):
-    '''Numerically solve the Schroedinger equation over time for the given
-        initial condtions.
-        
-    Parameters
-    ----------
-    psi0 : WaveFunction
-        Initial state of the wavefunction.
-    V : ArrayLike
-        Potential for the system.
-    progress : bool, default False
-        Print progress percentage.
-
-    Returns
-    -------
-    WaveFunctionHistory
-        Evolution history of the initial state over time.
-    '''
-    grid = psi0.grid
-
-    psi = np.zeros((grid.Nx, grid.Nt), dtype=complex)
-    psi[:,0] = psi0.psi
-
-    # set up matrix equation
-    # hbar = m = 1
-    alpha = 1/(4*grid.dx**2)
-    beta = 1j/grid.dt
-
-    # since Dirichlet boundary conditions are 0, only update interior
-    d = np.full(grid.Nx-2-1, alpha)
-    A = np.diag(beta - 2*alpha - V[1:-1]/2) + np.diag(d, 1) + np.diag(d, -1)
-    B = np.diag(beta + 2*alpha + V[1:-1]/2) - np.diag(d, 1) - np.diag(d, -1)
-
-    # update state
-    lu, piv = lu_factor(A)
-    for n in range(grid.Nt-1):
-        psi[1:-1,n+1] = lu_solve((lu, piv), B @ psi[1:-1,n])
-        if progress and n % ((grid.Nt-1)//10) == 0:
-            print(f'{100*n/(grid.Nt-1):.0f}%')
-
-    return WaveFunctionHistory(grid, psi)
 
 def animate_histories(histories: ArrayLike, V=None, labels=None, filename=None, display='all',
     every=2, timescale=1.0, **kwargs):
@@ -262,10 +215,12 @@ def animate_histories(histories: ArrayLike, V=None, labels=None, filename=None, 
         axes = [axes]
 
     # draw potential
-    if V:
+    if V is not None and 'pdf' in display:
         V_max = np.max(V)
         if not np.isclose(V_max, 0.0):
-            ax.plot(grid.x, 0.2*V/V_max, color='black', linewidth=1.5, alpha=0.7)
+            height = axes[0].get_ylim()[1] * 0.9
+            axes[0].plot(grid.x, height*V/V_max, color='black',
+                linewidth=1.5, alpha=0.7)
 
     # plot lines
     lines = {}
