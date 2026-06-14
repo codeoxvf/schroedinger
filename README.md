@@ -1,6 +1,6 @@
 # Numerical simulation of Schroedinger's equation
 
-![](scattering.gif)
+![](figures/scattering.gif)
 
 *Gaussian wave packet scattering off a step potential.*
 
@@ -33,14 +33,14 @@ Profiling using `line_profiler` indicated that runtime was dominated by repeated
 Exploiting the tridiagonal (banded) structure of $A$ and $B$, I updated the solver to use the `scipy` banded matrix solver instead of LU decomposition.
 Additionally, I replaced the naive matrix multiplication with a much-more efficient scalar multiplication of slices.
 
-![](perf.png)
+![](figures/perf.png)
 
 Interestingly, naive matrix multiplication appears to dominate the time complexity of the banded solver, so an $O(n^2)$ time complexity is clearly visible for both the LU and naive banded solvers.
 Meanwhile, the fully optimised banded solver vastly outperformed both.
 
 A speedup factor $S = t_\text{LU}/t_\text{banded}$ was calculated to quantify the performance improvement.
 
-![](speedup.png)
+![](figures/speedup.png)
 
 | dx      | N    | LU time (s) | Banded naive (s) | Banded (s) | Speedup (naive) | Speedup (banded) |
 | ------- | ---- | ----------- | ---------------- | ---------- | --------------- | ---------------- |
@@ -57,7 +57,7 @@ This compared the numerical and analytical results for eigenstates of an infinit
 
 Interestingly, while the PDFs passed the tests, the numerical solution accumulated a phase error linearly with time.
 
-![](phase.png)
+![](figures/phase.png)
 
 ## Implementation details (Crank-Nicholson discretisation)
 

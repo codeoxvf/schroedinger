@@ -44,7 +44,7 @@ plt.plot(df['dx'], df['t_banded'], 'o', label='Banded')
 plt.xlabel('$dx$')
 plt.ylabel('$t$')
 plt.legend()
-plt.savefig('perf.png')
+plt.savefig('figures/perf.png')
 plt.show()
 
 #%%
@@ -59,7 +59,7 @@ plt.plot(df['N'], df['speedup_banded'], 'o', label='LU / banded')
 plt.xlabel('$N$')
 plt.ylabel('Speedup factor')
 plt.legend()
-plt.savefig('speedup.png')
+plt.savefig('figures/speedup.png')
 plt.show()
 
 #%%

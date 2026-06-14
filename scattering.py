@@ -23,5 +23,5 @@ wf = WaveFunction(grid, psi0)
 wfh = cn_solve(wf, V)
 
 #%%
-anim = animate_histories(wfh, V=V, filename='scattering.gif')
+anim = animate_histories(wfh, V=V, filename='figures/scattering.gif')
 plt.show()
