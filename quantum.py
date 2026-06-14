@@ -214,14 +214,6 @@ def animate_histories(histories: ArrayLike, V=None, labels=None, filename=None, 
     if isinstance(axes, plt.Axes):
         axes = [axes]
 
-    # draw potential
-    if V is not None and 'pdf' in display:
-        V_max = np.max(V)
-        if not np.isclose(V_max, 0.0):
-            height = axes[0].get_ylim()[1] * 0.9
-            axes[0].plot(grid.x, height*V/V_max, color='black',
-                linewidth=1.5, alpha=0.7)
-
     # plot lines
     lines = {}
     ys = {}
@@ -240,8 +232,16 @@ def animate_histories(histories: ArrayLike, V=None, labels=None, filename=None, 
 
     ax = axes[0]
     if showlabels:
-        fig.legend(*ax.get_legend_handles_labels())#, loc='lower right')
+        fig.legend(*ax.get_legend_handles_labels())
     text = ax.text(0.01, 0.98, '$t = 0.00$', transform=ax.transAxes, va='top')
+
+    # draw potential
+    if V is not None and 'pdf' in display:
+        V_max = np.max(V)
+        if not np.isclose(V_max, 0.0):
+            height = axes[0].get_ylim()[1] * 0.9
+            axes[0].plot(grid.x, height*V/V_max, color='black',
+                linewidth=1.5, alpha=0.7)
 
     def update(t):
         for d in lines:
