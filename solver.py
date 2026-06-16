@@ -20,10 +20,10 @@ def _schrod_matrix_dense(grid: Grid, V: ArrayLike):
 def _get_step_dense(grid: Grid, V: ArrayLike):
     lu, piv, b = _schrod_matrix_dense(grid, V)
 
-    def step(psi, n):
-        b_psi = b @ psi[1:-1,n]
-        psi[1:-1,n+1] = lu_solve((lu, piv), b_psi)
-    
+    def step(dest, psi):
+        b_psi = b @ psi[1:-1]
+        dest[1:-1] = lu_solve((lu, piv), b_psi)
+
     return step
 
 def _schrod_matrix_banded_naive_mult(grid: Grid, V: ArrayLike):
@@ -46,10 +46,10 @@ def _schrod_matrix_banded_naive_mult(grid: Grid, V: ArrayLike):
 def _get_step_banded_naive_mult(grid: Grid, V: ArrayLike):
     ab, b = _schrod_matrix_banded_naive_mult(grid, V)
 
-    def step(psi, n):
-        b_psi = b @ psi[1:-1,n]
-        psi[1:-1,n+1] = solve_banded((1, 1), ab, b_psi)
-    
+    def step(dest, psi):
+        b_psi = b @ psi[1:-1]
+        dest[1:-1] = solve_banded((1, 1), ab, b_psi)
+
     return step
 
 def _schrod_matrix_banded(grid: Grid, V: ArrayLike):
@@ -71,36 +71,44 @@ def _schrod_matrix_banded(grid: Grid, V: ArrayLike):
 def _get_step_banded(grid: Grid, V: ArrayLike):
     ab, alpha, gamma = _schrod_matrix_banded(grid, V)
 
-    def step(psi, n):
-        b_psi = gamma * psi[1:-1,n]
-        b_psi[1:] -= alpha * psi[1:-2,n]
-        b_psi[:-1] -= alpha * psi[2:-1,n]
-        psi[1:-1,n+1] = solve_banded((1, 1), ab, b_psi)
-    
+    def step(dest, psi):
+        b_psi = gamma * psi[1:-1]
+        b_psi[1:] -= alpha * psi[1:-2]
+        b_psi[:-1] -= alpha * psi[2:-1]
+        dest[1:-1] = solve_banded((1, 1), ab, b_psi)
+
     return step
 
-def cn_solve(wf: WaveFunction, V=None, method='banded', progress=False):
+def cn_solve(wf: WaveFunction, V=None, method='banded', history=False, progress=False):
     '''Numerically solve the Schroedinger equation over time for the given
         initial condtions.
-        
+
     Parameters
     ----------
     wf : WaveFunction
         Initial state of the wavefunction.
     V : ArrayLike, default None
         Potential for the system. If None, treat as zero potential.
+    method: str, default 'banded'
+        The method of solving the matrix equation ('banded', 'banded-naive-mult',
+        'lu' in order of speed).
+    history: bool, default False
+        Return the full evolution history.
     progress : bool, default False
         Print progress percentage.
 
     Returns
     -------
-    WaveFunctionHistory
-        Evolution history of the initial state over time.
+    WaveFunction or WaveFunctionHistory
+        Final state or evolution history of the initial state over time.
     '''
     grid = wf.grid
 
-    psi = np.zeros((grid.Nx, grid.Nt), dtype=complex)
-    psi[:,0] = wf.psi
+    if history:
+        psi = np.zeros((grid.Nx, grid.Nt), dtype=complex)
+        psi[:,0] = wf.psi
+    else:
+        psi = wf.psi.copy()
 
     if V is None:
         V = np.zeros(grid.Nx)
@@ -116,8 +124,14 @@ def cn_solve(wf: WaveFunction, V=None, method='banded', progress=False):
 
     # update state
     for n in range(grid.Nt-1):
-        step(psi, n)
+        if history:
+            step(psi[:,n+1], psi[:,n])
+        else:
+            step(psi, psi)
         if progress and n % ((grid.Nt-1)//10) == 0:
             print(f'{100 * n / (grid.Nt-1):.0f}%')
 
-    return WaveFunctionHistory(grid, psi)
+    if history:
+        return WaveFunctionHistory(grid, psi, normalise=False)
+    else:
+        return WaveFunction(grid, psi, normalise=False)

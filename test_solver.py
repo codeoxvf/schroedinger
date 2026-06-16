@@ -29,7 +29,7 @@ X, T = np.meshgrid(grid.x, grid.t, indexing='ij')
 # even eigenstates are zero so only test odd ones
 for n in range(1, 12, 2):
     wfh_exact = WaveFunctionHistory(grid, psi_n(n, X, T))
-    wfh_num = cn_solve(wfh_exact.at_time(0))
+    wfh_num = cn_solve(wfh_exact.at_time(0), history=True)
 
     if test_accuracy(wfh_exact, wfh_num):
         print(f'PDF accuracy test passed for n={n} eigenstate')

@@ -20,7 +20,7 @@ psi0 = np.exp(1j*p0*(grid.x-x0) - (grid.x-x0)**2/(4*sigma0**2))
 wf = WaveFunction(grid, psi0)
 
 #%%
-wfh = cn_solve(wf, V)
+wfh = cn_solve(wf, V, history=True)
 
 #%%
 anim = animate_histories(wfh, V=V, filename='figures/scattering.gif')
